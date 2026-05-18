@@ -65,7 +65,7 @@ Tested 4 configs across 5 questions on *Identifying and Scaling AI Use Cases* (P
 
 **Key finding:** `top_k` mattered more than chunk size. Doubling chunk size (C) lowered similarity scores and didn't improve hits. pdfplumber produced cleaner embeddings (higher avg score) but still missed 1 question at `top_k=3`.
 
-The eval set is intentionally being expanded with harder questions — multi-hop, implicit answers, and unanswerable questions — to stress-test the system beyond the current easy baseline.
+After expanding to 10 questions (including implicit answers, multi-hop, and one unanswerable question), hit rate dropped to **90%** — Q10 (legal contract review) correctly returned "I could not find the answer" because the document doesn't cover it. That's the eval working as intended.
 
 Run it yourself:
 
