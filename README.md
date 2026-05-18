@@ -22,7 +22,7 @@ PDF → Chunk → Embed → Retrieve → Generate → Answer
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Create a `.env` file:
@@ -54,21 +54,24 @@ python main.py "Your question here"
 
 ## Eval Results
 
-Ran a retrieval evaluation across 5 questions on *Identifying and Scaling AI Use Cases* (PDF):
+Tested 4 configs across 5 questions on *Identifying and Scaling AI Use Cases* (PDF).
 
-| Metric | Result |
-|---|---|
-| Total Questions | 5 |
-| Hits | 5 |
-| Hit Rate | 100% |
-| Embedding Model | text-embedding-3-small |
-| Chunk Size | 500 / Overlap 50 |
-| Top K | 6 |
+| Config | top_k | chunk_size | loader | Hit Rate | Avg Score |
+|---|---|---|---|---|---|
+| A | 3 | 500 | pymupdf | 80% | 0.6637 |
+| **B** | **6** | **500** | **pymupdf** | **100%** | **0.6637** |
+| C | 3 | 1000 | pymupdf | 80% | 0.6359 |
+| D | 6 | 500 | pdfplumber | 80% | 0.6922 |
 
-All 5 questions retrieved the correct chunks and generated grounded answers. Run it yourself:
+**Key finding:** `top_k` mattered more than chunk size. Doubling chunk size (C) lowered similarity scores and didn't improve hits. pdfplumber produced cleaner embeddings (higher avg score) but still missed 1 question at `top_k=3`.
+
+The eval set is intentionally being expanded with harder questions — multi-hop, implicit answers, and unanswerable questions — to stress-test the system beyond the current easy baseline.
+
+Run it yourself:
 
 ```bash
-python -m evals.run_eval
+python -m evals.run_eval        # single config
+python evals/compare_configs.py # all 4 configs
 ```
 
 Report saved to `evals/report.md`.
@@ -98,7 +101,7 @@ This project sits at the application layer — OpenAI and Anthropic APIs are the
 
 ## What's next
 
-- Swap `pypdf` for `pdfplumber` to fix PDF encoding issues
+- Add harder eval questions — implicit answers, multi-hop, unanswerable — to stress-test beyond the easy baseline
 - Add ChromaDB or FAISS to persist embeddings across runs
 - Implement recursive/semantic chunking
 - Add conversation memory for follow-up questions

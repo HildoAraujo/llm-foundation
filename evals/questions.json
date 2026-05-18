@@ -2,26 +2,61 @@
   {
     "id": 1,
     "question": "What are the six AI use case primitives?",
-    "must_contain": ["primitives"]
+    "must_contain": ["primitives"],
+    "difficulty": "easy"
   },
   {
     "id": 2,
     "question": "How does BBVA use AI for credit analysis?",
-    "must_contain": ["BBVA", "credit"]
+    "must_contain": ["BBVA", "credit"],
+    "difficulty": "easy"
   },
   {
     "id": 3,
     "question": "What is the GPT Lab process at Estee Lauder?",
-    "must_contain": ["Estée Lauder", "GPT"]
+    "must_contain": ["Estée Lauder", "GPT"],
+    "difficulty": "easy"
   },
   {
     "id": 4,
     "question": "What is automation as an AI use case?",
-    "must_contain": ["automation"]
+    "must_contain": ["automation"],
+    "difficulty": "easy"
   },
   {
     "id": 5,
     "question": "How should companies gather and prioritize AI use cases?",
-    "must_contain": ["prioritize"]
+    "must_contain": ["prioritize"],
+    "difficulty": "easy"
+  },
+  {
+    "id": 6,
+    "question": "How does AI help marketing teams work more efficiently across a full workflow?",
+    "must_contain": ["marketing"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 7,
+    "question": "What role do subject matter experts play in building GPTs?",
+    "must_contain": ["SME", "subject matter"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 8,
+    "question": "What makes an AI use case high impact but low effort?",
+    "must_contain": ["impact"],
+    "difficulty": "medium"
+  },
+  {
+    "id": 9,
+    "question": "How many use cases were analyzed to identify the six primitives?",
+    "must_contain": ["600"],
+    "difficulty": "hard"
+  },
+  {
+    "id": 10,
+    "question": "What does the document say about the cost savings from using AI in legal contract review?",
+    "must_contain": ["legal", "contract"],
+    "difficulty": "hard"
   }
 ]
