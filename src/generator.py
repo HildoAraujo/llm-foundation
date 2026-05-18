@@ -36,17 +36,16 @@ def generate_answer(query: str, context_chunks: list[str], model:str, max_tokens
     return response.content[0].text
 
 
-chunks = [
-    "Python is a programming language",
-    "It is commonly used in Ai"
-]
-
-answer = generate_answer (
-    query = "Whats is python used for?",
-    context_chunks = chunks,
-    model = "claude-sonnet-4-6",
-    max_tokens = 200, 
-    temperature = 0
-)
-
-print(answer)
+if __name__ == "__main__":
+    chunks = [
+        "Python is a programming language",
+        "It is commonly used in AI"
+    ]
+    answer = generate_answer(
+        query="What is Python used for?",
+        context_chunks=chunks,
+        model="claude-sonnet-4-6",
+        max_tokens=200,
+        temperature=0
+    )
+    print(answer)

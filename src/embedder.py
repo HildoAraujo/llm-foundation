@@ -21,9 +21,7 @@ def embed_text(texts: list[str], model:str) -> np.ndarray:
 
     return np.array(embeddings)  
 
-result = embed_text(
-    ["hello", "world"],
-    "text-embedding-3-small"
-)      
-print(result)
+if __name__ == "__main__":
+    result = embed_text(["hello", "world"], "text-embedding-3-small")
+    print(result)
     

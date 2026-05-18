@@ -2,7 +2,7 @@
 
 ## Run Metadata
 
-- Timestamp: 2026-05-18T22:37:23.724715
+- Timestamp: 2026-05-18T23:06:06.538958+00:00
 - Embedding Model: text-embedding-3-small
 - Chunk Size: 500
 - Chunk Overlap: 50
@@ -30,15 +30,15 @@
 These primitives represent fundamental use case types that apply across all departments and disciplines, and were identified from an analysis of over 600 use cases sourced from customers.
 
 ### Q2: How does BBVA use AI for credit analysis?
-- **Status:** HIT ✅ | **Top Score:** 0.6543
+- **Status:** HIT ✅ | **Top Score:** 0.6542
 - **Answer:** Based on the provided context, **BBVA uses AI through their "Credit Analysis Pro GPT"** tool, which helps credit risk analysts **accelerate their assessments** by:
 
 - **Pulling unstructured data** from a variety of sources, including:
   - Annual reports
   - ESG assessments
-  - Press articles
+  - Press sources
 
-This AI tool essentially acts as a super-assistant, helping analysts process and synthesize information from multiple, varied sources more efficiently to support their credit risk analysis work.
+This AI tool essentially acts as a **super-assistant**, helping analysts work more efficiently by gathering and processing information from multiple, varied data sources that would otherwise be time-consuming to manually review.
 
 ### Q3: What is the GPT Lab process at Estee Lauder?
 - **Status:** HIT ✅ | **Top Score:** 0.5923
@@ -50,52 +50,40 @@ This AI tool essentially acts as a super-assistant, helping analysts process and
 4. **Launch** – The full team deploys the GPT and creates a user guide
 5. **Pivot and Scale** – The full team uses feedback loops to iterate and optimize based on GPT performance
 
-As Charmaine Pek, Director of ChatGPT Enterprise Adoption, notes: *"Designing the right use cases means asking the right questions — Why do we want to build this GPT? What is the problem that we're trying to solve? What impact will it have?"*
+As Charmaine Pek, Director of ChatGPT Enterprise Adoption, noted, the process starts by **asking the right questions**: *"Why do we want to build this GPT? What is the problem that we're trying to solve? What impact will it have?"*
 
 ### Q4: What is automation as an AI use case?
 - **Status:** HIT ✅ | **Top Score:** 0.6481
-- **Answer:** Based on the context provided, **automation** as an AI use case involves identifying and handing off **repeatable, routine tasks** to AI.
+- **Answer:** Based on the context provided, **automations** as an AI use case involve:
 
-Key points about automations include:
+- **Automating parts of a task** — particularly **repeatable, routine tasks** that can be handed off to AI.
 
-- They can be **simple or complex**:
-  - **Simple example**: Generating weekly competitive updates
-  - **Complex example**: Creating a finance report for weekly executive briefings, ready for human review
+Automations can range in complexity:
 
-- The foundation of automations relies on **memory and custom instructions** as key components
+- **Simple automations** — such as generating weekly competitive updates
+- **More complex automations** — such as creating a finance report for weekly executive briefings, ready for human review
 
-- They are particularly useful for addressing **repetitive, low-value tasks** — those tedious, manual tasks that:
-  - Take people away from more strategic work
-  - Slow productivity
-  - Make work more frustrating and less fulfilling
+The context also notes that **memory and custom instructions are key** to making automations work effectively.
 
-- Examples of such tasks include summarizing meeting notes, looking for trends in spreadsheet data, and generating product-related content
-
-In essence, automations allow businesses to free up their workforce from routine tasks so employees can focus on higher-value, more strategic work.
+More broadly, automations often stem from identifying **repetitive, low-value tasks** — the tedious, manual work that takes people away from more strategic activities, such as summarizing meeting notes, looking for trends in spreadsheet data, or generating product content. By automating these tasks with AI, organizations can improve productivity and make work more fulfilling for employees.
 
 ### Q5: How should companies gather and prioritize AI use cases?
 - **Status:** HIT ✅ | **Top Score:** 0.7221
-- **Answer:** Based on the context provided, companies should gather and prioritize AI use cases through a **three-step process**:
+- **Answer:** Based on the context provided, companies should gather and prioritize AI use cases by following a **three-step process**:
 
 ## Step 1: Identify Opportunities
-- Understand **where AI adds value** by identifying parts of your business that can immediately benefit from AI
-- Focus on what AI excels at to spot high-impact opportunities
+- Understand what AI excels at and identify parts of your business that can immediately benefit from AI application.
 
-## Step 2: Teach Fundamental Use Cases
-- Help employees explore **foundational use cases** and start building their own
-- Encourage adoption through:
-  - Hackathons
-  - Use case workshops
-  - Peer-led learning sessions
+## Step 2: Teach Employees Fundamental Use Cases
+- Help teams explore foundational use cases and start building their own, empowering employees to find use cases that work best for them and the company — described as "often a faster path to success."
 
-## Step 3: Collect and Prioritize
-- Use an **Impact/Effort Framework** to focus on high-impact, low-effort opportunities
-- Promote the prioritization framework **company-wide**, encouraging employees to use it in team meetings
-- For high-value, high-effort use cases, consider deploying a **Custom GPT** to scope the work required
+## Step 3: Collect and Prioritize Use Cases
+- Focus on **high-impact, low-effort opportunities** using an **Impact/Effort Framework**
+- Promote this prioritization framework company-wide, encouraging employees to use it in team meetings
+- For high-value, high-effort use cases, consider deploying a Custom GPT to scope the work required
 
-## Key Principles to Keep in Mind:
-1. **AI adoption should be led and encouraged by leadership** — top-down support is a key hallmark of success
-2. **Avoid overcomplicating things** — empowering employees to find use cases that work best for them is often a faster path to success
-3. Complex use cases can feel impressive but often **slow you down**
-
-Leaders should champion use cases that make an impact on whole departments, as identifying opportunities in this way helps accelerate big wins that create further interest and investment.
+## Key Supporting Principles:
+- **AI adoption should be led and encouraged by leadership** — top-down support is highlighted as a key hallmark of success
+- Avoid overly complex use cases early on, as they can slow progress
+- **Encourage adoption** through hackathons, use case workshops, and peer-led learning sessions
+- Have leaders **champion use cases** that make an impact on whole departments, as identifying wins in this way helps accelerate further interest and investment

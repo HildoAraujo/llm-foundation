@@ -18,11 +18,6 @@ def chunk_text(text: str, strategy: str, size: int, overlap:int) -> list[str]:
         raise ValueError(f"Unknown strategy: {strategy}")    
 
 
-text = "dskndskn"
-result = chunk_text(
-    text=text,
-    size = 4,
-    strategy = "fixed",
-    overlap =1
-) 
-print(result)       
+if __name__ == "__main__":
+    result = chunk_text(text="dskndskn", strategy="fixed", size=4, overlap=1)
+    print(result)
