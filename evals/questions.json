@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "question": "What are the six AI use case primitives?",
+    "must_contain": ["primitives"]
+  },
+  {
+    "id": 2,
+    "question": "How does BBVA use AI for credit analysis?",
+    "must_contain": ["BBVA", "credit"]
+  },
+  {
+    "id": 3,
+    "question": "What is the GPT Lab process at Estee Lauder?",
+    "must_contain": ["Estée Lauder", "GPT"]
+  },
+  {
+    "id": 4,
+    "question": "What is automation as an AI use case?",
+    "must_contain": ["automation"]
+  },
+  {
+    "id": 5,
+    "question": "How should companies gather and prioritize AI use cases?",
+    "must_contain": ["prioritize"]
+  }
+]

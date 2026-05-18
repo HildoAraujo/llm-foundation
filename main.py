@@ -48,13 +48,15 @@ def main():
         config["embedding_model"]
     )
 
-    retrieved_chunks = retrieve (
+    retrieval_result = retrieve(
         query = args.question,
         chunks = chunks,
         embeddings = embeddings,
         top_k = config["top_k"],
         embedding_model = config["embedding_model"]
     )
+
+    retrieved_chunks = retrieval_result["chunks"]
 
     print("\n=== RETRIEVED CHUNKS ===\n")
 
