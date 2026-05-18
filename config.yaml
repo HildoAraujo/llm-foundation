@@ -1,0 +1,13 @@
+pdf_path: "data/Identifying and Scaling AI Use Cases.pdf"
+
+chunking:
+  strategy: "fixed"
+  size: 500
+  overlap: 50
+
+embedding_model: "text-embedding-3-small"
+
+top_k: 6
+
+generation_model: "claude-sonnet-4-6"
+max_tokens: 500
