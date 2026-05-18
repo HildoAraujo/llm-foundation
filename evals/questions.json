@@ -55,8 +55,33 @@
   },
   {
     "id": 10,
-    "question": "What does the document say about the cost savings from using AI in legal contract review?",
+    "question": "What does the document say about cost savings from using AI in legal contract review?",
     "must_contain": ["legal", "contract"],
-    "difficulty": "hard"
+    "difficulty": "negative",
+    "expected_outcome": "miss"
+  },
+  {
+    "id": 11,
+    "question": "How should teams respond when an AI use case doesn't perform as expected?",
+    "must_contain": ["pivot"],
+    "difficulty": "implicit"
+  },
+  {
+    "id": 12,
+    "question": "What does the document say about the role of leadership in making AI adoption succeed?",
+    "must_contain": ["leadership", "champion"],
+    "difficulty": "implicit"
+  },
+  {
+    "id": 13,
+    "question": "Which of the six AI use case primitives best describes what BBVA's Credit Analysis ProGPT does?",
+    "must_contain": ["research", "BBVA"],
+    "difficulty": "multi-hop"
+  },
+  {
+    "id": 14,
+    "question": "How long is the brief that business users create during the Design phase of Estee Lauder's GPT process?",
+    "must_contain": ["two-page"],
+    "difficulty": "hard-number"
   }
 ]

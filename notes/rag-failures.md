@@ -90,43 +90,61 @@
 
 ---
 
-## Eval Results — Config Comparison
+## PDF Loader Comparison
 
-Tested across 5 questions on *Identifying and Scaling AI Use Cases* (PDF).
-Hit = retrieved chunk contained all required keywords for that question.
+Tested all three loaders on first 300 characters of *Identifying and Scaling AI Use Cases*:
 
-| Config | top_k | chunk_size | loader | Hits | Hit Rate | Avg Score |
-|---|---|---|---|---|---|---|
-| A | 3 | 500 | pymupdf | 4/5 | 80% | 0.6637 |
-| B | 6 | 500 | pymupdf | 5/5 | **100%** | 0.6637 |
-| C | 3 | 1000 | pymupdf | 4/5 | 80% | 0.6359 |
-| D | 6 | 500 | pdfplumber | 4/5 | 80% | **0.6922** |
+- **pypdf** — `I d e n t i f y i n g a n d s c a l i n g A I` (garbage, spaces between every character)
+- **pdfplumber** — `Identifying and scaling AI use cases How early adopters...` (clean)
+- **pymupdf** — `Identifying and scaling AI use cases How early adopters...` (clean)
+
+**Winner: pymupdf** (set as default). Both pdfplumber and pymupdf produce clean text. pypdf is unusable for this PDF type. The mangled text degraded retrieval on harder/implicit questions even though easy questions still hit — a hidden failure mode.
+
+---
+
+## Eval Results — 5-Config Sweep (14 questions)
+
+Tested on 14 questions: 5 easy, 3 medium, 2 implicit, 2 multi-hop, 1 specific number, 1 negative test.
+Hit rate on negative test = correctly refusing to answer (system said "I could not find the answer").
+
+| Config | Chunk | Overlap | Top K | Hit Rate | Avg Score |
+|---|---|---|---|---|---|
+| baseline | 500 | 50 | 3 | 71% | 0.6226 |
+| **wider_retrieval** | **500** | **50** | **6** | **79%** | **0.6226** |
+| larger_chunks | 1000 | 100 | 3 | 71% | 0.6025 |
+| smaller_chunks | 250 | 25 | 6 | 71% | 0.6314 |
+| no_overlap | 500 | 0 | 3 | 71% | 0.6075 |
 
 ---
 
 ## What the numbers revealed
 
-**`top_k` mattered more than chunk size.**
-Config A (top_k=3, chunk=500) and Config C (top_k=3, chunk=1000) both hit 80%. Doubling the chunk size didn't help — it just made each chunk noisier and lowered the average similarity score (0.6637 → 0.6359). The retrieval ceiling was hit by not fetching enough chunks, not by chunk size.
+**`top_k=6` was the only config that beat baseline.**
+Every config at `top_k=3` landed at 71%. Wider retrieval (top_k=6) was the only lever that moved the needle — from 71% to 79%. Chunk size and overlap changes made no difference at the same top_k.
 
-**Bigger chunks hurt score quality.**
-Config C had the lowest average similarity score (0.6359) despite larger chunks. More text per chunk dilutes the embedding signal — the chunk becomes about many things at once instead of one specific thing.
+**Smaller chunks had the best avg similarity score but same hit rate.**
+`smaller_chunks` (chunk=250) had the highest avg score (0.6314) — tighter, more focused embeddings. But at top_k=6, it still only hit 71%. The precision was there; the recall ceiling was elsewhere.
 
-**pdfplumber had higher similarity scores but same hit rate as top_k=3.**
-Config D (pdfplumber) produced the highest average score (0.6922) — cleaner text means tighter embeddings. But it still missed 1 question. The combination of better loader + more retrieved chunks (top_k=6) would likely hit 100%.
+**Larger chunks scored worst across all metrics.**
+`larger_chunks` (chunk=1000) had the lowest avg score (0.6025) and same 71% hit rate. More text per chunk = embedding that's about everything = precise at nothing.
 
-**The one miss across configs A, C, D was the same question.**
-Q3 — *"What is the GPT Lab process at Estée Lauder?"* — was the hardest to retrieve. The keyword `Estée Lauder` with the accent caused matching issues across some chunks. A preprocessing step to normalize accented characters would fix this.
+**Removing overlap hurt.**
+`no_overlap` scored second worst (0.6075). Overlap exists because answers often sit at chunk boundaries — without it, you silently lose context at every seam.
+
+**Hardest question categories:**
+- **Multi-hop** (Q13 — "Which primitive describes BBVA's ProGPT?"): missed consistently — requires combining the primitives list AND the BBVA description in retrieved chunks simultaneously
+- **Implicit** (Q12 — leadership/champion): hit rate inconsistent — "champion" appears infrequently and in specific chunks that weren't always retrieved
+- **Specific numbers** (Q14 — "two-page brief"): hit on most configs — the term was in the Estée Lauder chunk that retrieves reliably
 
 ---
 
 ## What surprised me
 
-**Cosine similarity is robust to garbage text.**
-`pypdf` produced `I d e n t i f y i n g` — spaces between every character. Config B still hit 100%. The embeddings found semantic meaning even in mangled text. That's genuinely unexpected.
+**Easy questions masked real retrieval problems.**
+A 5-question eval at 100% looks great. A 14-question eval with implicit and multi-hop questions at 71-79% shows the actual ceiling. The system doesn't understand — it pattern-matches. Multi-hop questions expose that directly.
 
-**The generator was honest when context was missing.**
-At top_k=3 it said "I could not find the answer" instead of making something up. The system prompt held. Good surprise.
+**Overlap matters more than chunk size.**
+Removing overlap (`no_overlap`) hurt more than doubling chunk size. Chunk boundaries are where answers live — and overlap is what ensures they're captured.
 
-**Larger chunks hurt, not helped.**
-Intuition says more context per chunk = better retrieval. The numbers said the opposite — smaller, focused chunks produced better similarity scores and equal or better hit rates.
+**The negative test passed every time.**
+Q10 (legal contract review) was correctly refused across all 5 configs. The system prompt held even with harder questions around it.

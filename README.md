@@ -54,29 +54,26 @@ python main.py "Your question here"
 
 ## Eval Results
 
-Tested 4 configs across 5 questions on *Identifying and Scaling AI Use Cases* (PDF).
+Ran 5 configs against 14 questions (easy, implicit, multi-hop, specific numbers, 1 unanswerable negative test) on *Identifying and Scaling AI Use Cases*. The best config hit 79%, worst 71% — a realistic range that surfaces real retrieval gaps.
 
-| Config | top_k | chunk_size | loader | Hit Rate | Avg Score |
+| Config | Chunk | Overlap | Top K | Hit Rate | Avg Score |
 |---|---|---|---|---|---|
-| A | 3 | 500 | pymupdf | 80% | 0.6401 |
-| **B** | **6** | **500** | **pymupdf** | **90%** | **0.6402** |
-| C | 3 | 1000 | pymupdf | 80% | 0.6218 |
-| D | 6 | 500 | pdfplumber | 80% | 0.6382 |
+| baseline | 500 | 50 | 3 | 71% | 0.6226 |
+| **wider_retrieval** | **500** | **50** | **6** | **79%** | **0.6226** |
+| larger_chunks | 1000 | 100 | 3 | 71% | 0.6025 |
+| smaller_chunks | 250 | 25 | 6 | 71% | 0.6314 |
+| no_overlap | 500 | 0 | 3 | 71% | 0.6075 |
 
-Tested on 10 questions (5 easy, 4 medium/hard, 1 unanswerable). The unanswerable question correctly returned "I could not find the answer" across all configs.
-
-**Key findings:** `top_k` mattered more than chunk size or loader. Bigger chunks (C) scored worst — more text per chunk dilutes the embedding signal. pdfplumber (D) produced cleaner text but didn't outperform pymupdf on harder questions.
-
-After expanding to 10 questions (including implicit answers, multi-hop, and one unanswerable question), hit rate dropped to **90%** — Q10 (legal contract review) correctly returned "I could not find the answer" because the document doesn't cover it. That's the eval working as intended.
+**Winner:** `wider_retrieval` (top_k=6, chunk=500). **Surprising finding:** smaller chunks (250) had the highest avg similarity score but same hit rate as baseline — more precise embeddings but not enough retrieved to cover all answers. Larger chunks scored worst across both metrics.
 
 Run it yourself:
 
 ```bash
-python -m evals.run_eval        # single config
-python evals/compare_configs.py # all 4 configs
+python -m evals.run_eval          # single config with answers
+python evals/run_comparison.py    # 5-config sweep, retrieval only
 ```
 
-Report saved to `evals/report.md`.
+Full results in `evals/results/comparison.md`.
 
 ## What I learned
 
@@ -86,8 +83,8 @@ Built every layer by hand — chunking, embedding, retrieval, generation. It's n
 **Why bugs in AI pipelines are sneaky**
 Most bugs here weren't crashes — a letter `O` instead of zero, a missing comma silently concatenating strings, a wrong variable name returning `None` quietly. AI pipelines fail silently more often than they crash loudly.
 
-**Embeddings are more robust than expected**
-The PDF was read with spaces between every character (`I d e n t i f y i n g`) and retrieval still worked at 100% hit rate. Cosine similarity finds semantic meaning even in noisy text.
+**PDF loader quality matters — but not equally**
+`pypdf` produced mangled text (`I d e n t i f y i n g`). Both `pdfplumber` and `pymupdf` produce clean text. Switched to `pymupdf` as default. Despite the garbage text, embeddings were robust enough to hit on easy questions — but it hurt on implicit/multi-hop ones.
 
 **`top_k` changes everything**
 At `top_k=3` the system said "I can't find the answer." At `top_k=6` it found the BBVA finance example. One config value was the difference between a useful and a useless answer.
@@ -103,7 +100,8 @@ This project sits at the application layer — OpenAI and Anthropic APIs are the
 
 ## What's next
 
-- Add harder eval questions — implicit answers, multi-hop, unanswerable — to stress-test beyond the easy baseline
+- Add proper retrieval metrics (Recall@k, MRR) beyond keyword hit rate
+- LLM-as-judge for answer quality scoring
 - Add ChromaDB or FAISS to persist embeddings across runs
 - Implement recursive/semantic chunking
 - Add conversation memory for follow-up questions

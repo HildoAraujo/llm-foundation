@@ -29,26 +29,15 @@ def load_config(path: str) -> dict:
 
 
 def check_hit(retrieved_chunks: list[str], must_contain: list[str]) -> bool:
-    """
-    True if ANY retrieved chunk contains ALL keywords in must_contain.
-    Case-insensitive.
-    """
-
     must_contain = [kw.lower() for kw in must_contain]
-
     for chunk in retrieved_chunks:
         chunk_lower = chunk.lower()
-
         if all(keyword in chunk_lower for keyword in must_contain):
             return True
-
     return False
 
 
-def run_eval(config: dict, questions: list[dict]) -> dict:
-    """
-    Run the retrieval evaluation pipeline.
-    """
+def run_eval(config: dict, questions: list[dict], generate: bool = True) -> dict:
     pdf_path = config["pdf_path"]
 
     text = load_pdf_text(
@@ -69,14 +58,13 @@ def run_eval(config: dict, questions: list[dict]) -> dict:
     )
 
     results = []
-
     hits = 0
 
     for q in questions:
-
         question_id = q["id"]
         question_text = q["question"]
         must_contain = q["must_contain"]
+        expected_outcome = q.get("expected_outcome", "hit")
 
         retrieval_result = retrieve(
             query=question_text,
@@ -90,12 +78,12 @@ def run_eval(config: dict, questions: list[dict]) -> dict:
         retrieved_ids = retrieval_result["chunk_ids"]
         scores = retrieval_result["scores"]
 
-        hit = check_hit(
-            retrieved_chunks=retrieved_chunks,
-            must_contain=must_contain
-        )
+        keyword_found = check_hit(retrieved_chunks, must_contain)
 
-        if hit:
+        # For negative questions, a miss is a pass
+        passed = (not keyword_found) if expected_outcome == "miss" else keyword_found
+
+        if passed:
             hits += 1
 
         answer = generate_answer(
@@ -104,12 +92,14 @@ def run_eval(config: dict, questions: list[dict]) -> dict:
             model=config["generation_model"],
             max_tokens=config["max_tokens"],
             temperature=0
-        )
+        ) if generate else None
 
         result = {
             "id": question_id,
             "question": question_text,
-            "hit": hit,
+            "expected_outcome": expected_outcome,
+            "passed": passed,
+            "keyword_found": keyword_found,
             "top_score": max(scores) if scores else 0.0,
             "retrieved_chunk_ids": retrieved_ids,
             "answer": answer,
@@ -118,7 +108,6 @@ def run_eval(config: dict, questions: list[dict]) -> dict:
         results.append(result)
 
     total_questions = len(questions)
-
     hit_rate = hits / total_questions if total_questions > 0 else 0.0
 
     return {
@@ -157,10 +146,16 @@ def format_results_markdown(results: dict, config: dict) -> str:
     lines.append("## Per-Question Results\n")
 
     for r in results["results"]:
-        hit_status = "HIT ✅" if r["hit"] else "MISS ❌"
+        if r["expected_outcome"] == "miss":
+            status = "CORRECT MISS ✅" if r["passed"] else "WRONG HIT ❌"
+        else:
+            status = "HIT ✅" if r["passed"] else "MISS ❌"
         lines.append(f"### Q{r['id']}: {r['question']}")
-        lines.append(f"- **Status:** {hit_status} | **Top Score:** {r['top_score']:.4f}")
-        lines.append(f"- **Answer:** {r['answer']}\n")
+        lines.append(f"- **Status:** {status} | **Top Score:** {r['top_score']:.4f}")
+        if r.get("answer"):
+            lines.append(f"- **Answer:** {r['answer']}\n")
+        else:
+            lines.append("")
 
     return "\n".join(lines)
 
