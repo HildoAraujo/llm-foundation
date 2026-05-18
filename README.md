@@ -1,10 +1,6 @@
 # LLM Foundations — RAG Pipeline
 
-A retrieval-augmented generation (RAG) pipeline built from scratch to understand the core mechanics of how LLMs work in production.
-
-## What it does
-
-Ask a question about a PDF and get a grounded answer — no hallucination, only what's in the document.
+A retrieval-augmented generation (RAG) pipeline built from scratch to understand how LLMs work in production. Every layer is hand-rolled — no LangChain, no abstractions.
 
 ```
 PDF → Chunk → Embed → Retrieve → Generate → Answer
@@ -12,10 +8,33 @@ PDF → Chunk → Embed → Retrieve → Generate → Answer
 
 ## Stack
 
-- **Chunker** — splits raw PDF text into fixed-size overlapping chunks
-- **Embedder** — converts chunks to vector embeddings via OpenAI (`text-embedding-3-small`)
-- **Retriever** — finds the most semantically relevant chunks using cosine similarity
-- **Generator** — sends retrieved context + query to Claude (`claude-sonnet-4-6`) and returns an answer
+| Layer | What it does | Model / Tool |
+|---|---|---|
+| Loader | Reads PDF, cleans text | `pymupdf` (default), `pdfplumber`, `pypdf` |
+| Chunker | Splits text into overlapping fixed-size chunks | Custom |
+| Embedder | Converts chunks to vectors | `text-embedding-3-small` (OpenAI) |
+| Retriever | Finds top-k most similar chunks via cosine similarity | `scikit-learn` |
+| Generator | Answers question from retrieved context only | `claude-sonnet-4-6` (Anthropic) |
+
+## Project Structure
+
+```
+├── src/
+│   ├── loader.py       # PDF loaders (3 options, switchable via config)
+│   ├── chunker.py      # Fixed-size chunking with overlap
+│   ├── embedder.py     # OpenAI embeddings
+│   ├── retriever.py    # Cosine similarity retrieval
+│   └── generator.py   # Claude answer generation
+├── evals/
+│   ├── questions.json          # 14-question eval set (easy → multi-hop → negative)
+│   ├── run_eval.py             # Single-config eval with generated answers
+│   ├── run_comparison.py       # 5-config sweep, retrieval only
+│   └── results/comparison.md  # Latest comparison results
+├── notes/
+│   └── rag-failures.md        # Bug log, loader comparison, eval analysis
+├── config.yaml
+└── main.py
+```
 
 ## Setup
 
@@ -32,10 +51,11 @@ OPENAI_API_KEY=your-openai-key
 ANTHROPIC_API_KEY=your-anthropic-key
 ```
 
-Add a PDF to the `data/` folder and update `config.yaml`:
+Add a PDF to `data/` and update `config.yaml`:
 
 ```yaml
 pdf_path: "data/your-document.pdf"
+loader: "pymupdf"
 chunking:
   strategy: "fixed"
   size: 500
@@ -54,7 +74,7 @@ python main.py "Your question here"
 
 ## Eval Results
 
-Ran 5 configs against 14 questions (easy, implicit, multi-hop, specific numbers, 1 unanswerable negative test) on *Identifying and Scaling AI Use Cases*. The best config hit 79%, worst 71% — a realistic range that surfaces real retrieval gaps.
+Ran 5 configs against 14 questions — easy, implicit, multi-hop, specific numbers, and 1 unanswerable negative test — on *Identifying and Scaling AI Use Cases*. Best config: 79%, worst: 71%. A realistic range that surfaces real retrieval gaps.
 
 | Config | Chunk | Overlap | Top K | Hit Rate | Avg Score |
 |---|---|---|---|---|---|
@@ -64,12 +84,10 @@ Ran 5 configs against 14 questions (easy, implicit, multi-hop, specific numbers,
 | smaller_chunks | 250 | 25 | 6 | 71% | 0.6314 |
 | no_overlap | 500 | 0 | 3 | 71% | 0.6075 |
 
-**Winner:** `wider_retrieval` (top_k=6, chunk=500). **Surprising finding:** smaller chunks (250) had the highest avg similarity score but same hit rate as baseline — more precise embeddings but not enough retrieved to cover all answers. Larger chunks scored worst across both metrics.
-
-Run it yourself:
+**Winner:** `wider_retrieval` (top_k=6, chunk=500). Surprising finding: smaller chunks (250) had the highest avg similarity score but the same hit rate — more precise embeddings, but not enough retrieved to cover multi-hop answers. Larger chunks scored worst on both metrics.
 
 ```bash
-python -m evals.run_eval          # single config with answers
+python -m evals.run_eval          # single config with generated answers
 python evals/run_comparison.py    # 5-config sweep, retrieval only
 ```
 
@@ -77,26 +95,17 @@ Full results in `evals/results/comparison.md`.
 
 ## What I learned
 
-**How RAG actually works**
-Built every layer by hand — chunking, embedding, retrieval, generation. It's not magic: relevant text is injected into the prompt at runtime, and the LLM answers from that context only.
+**RAG is retrieval first, generation second.** The generator is only as good as what the retriever gives it. Most failures in this project were retrieval failures, not generation failures.
 
-**Why bugs in AI pipelines are sneaky**
-Most bugs here weren't crashes — a letter `O` instead of zero, a missing comma silently concatenating strings, a wrong variable name returning `None` quietly. AI pipelines fail silently more often than they crash loudly.
+**Bugs in AI pipelines fail silently.** A letter `O` instead of zero, a missing comma that silently concatenated strings, a wrong variable name returning `None`. None of these crashed immediately — they just produced wrong results downstream.
 
-**PDF loader quality matters — but not equally**
-`pypdf` produced mangled text (`I d e n t i f y i n g`). Both `pdfplumber` and `pymupdf` produce clean text. Switched to `pymupdf` as default. Despite the garbage text, embeddings were robust enough to hit on easy questions — but it hurt on implicit/multi-hop ones.
+**PDF loader quality matters.** `pypdf` produced `I d e n t i f y i n g` — spaces between every character. Both `pdfplumber` and `pymupdf` produced clean text. Embeddings are surprisingly robust to noise on easy questions, but loader quality shows up on implicit and multi-hop questions.
 
-**`top_k` changes everything**
-At `top_k=3` the system said "I can't find the answer." At `top_k=6` it found the BBVA finance example. One config value was the difference between a useful and a useless answer.
+**`top_k` moved the needle more than chunk size.** Every config at `top_k=3` hit 71%. `top_k=6` hit 79%. Chunk size changes at the same `top_k` made no difference to hit rate. Overlap removal hurt more than doubling chunk size — chunk boundaries are where answers live.
 
-**A grounded system prompt prevents hallucination**
-When context was missing, the generator said so instead of making something up. That's the system prompt doing its job — and it worked in practice.
+**100% hit rate means your eval is broken.** A 5-question eval at 100% looks like success. A 14-question eval with implicit and multi-hop questions at 71–79% shows the actual system ceiling. Harder questions are where the real work happens.
 
-**How to evaluate a RAG system**
-Built an eval pipeline from scratch: keyword-based hit detection, cosine similarity scores per question, a markdown report. That's the same pattern used in production — measurable retrieval quality, not vibes.
-
-**The AI engineering stack**
-This project sits at the application layer — OpenAI and Anthropic APIs are the infrastructure, retrieval logic and prompt engineering are built on top. That's where most real-world AI products live.
+**Negative tests are essential.** The system correctly refused to answer a question the document doesn't cover — across all 5 configs. That's the system prompt doing its job, and you can only verify it with a test designed to produce a miss.
 
 ## What's next
 
