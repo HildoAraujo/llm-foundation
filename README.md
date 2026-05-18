@@ -58,12 +58,14 @@ Tested 4 configs across 5 questions on *Identifying and Scaling AI Use Cases* (P
 
 | Config | top_k | chunk_size | loader | Hit Rate | Avg Score |
 |---|---|---|---|---|---|
-| A | 3 | 500 | pymupdf | 80% | 0.6637 |
-| **B** | **6** | **500** | **pymupdf** | **100%** | **0.6637** |
-| C | 3 | 1000 | pymupdf | 80% | 0.6359 |
-| D | 6 | 500 | pdfplumber | 80% | 0.6922 |
+| A | 3 | 500 | pymupdf | 80% | 0.6401 |
+| **B** | **6** | **500** | **pymupdf** | **90%** | **0.6402** |
+| C | 3 | 1000 | pymupdf | 80% | 0.6218 |
+| D | 6 | 500 | pdfplumber | 80% | 0.6382 |
 
-**Key finding:** `top_k` mattered more than chunk size. Doubling chunk size (C) lowered similarity scores and didn't improve hits. pdfplumber produced cleaner embeddings (higher avg score) but still missed 1 question at `top_k=3`.
+Tested on 10 questions (5 easy, 4 medium/hard, 1 unanswerable). The unanswerable question correctly returned "I could not find the answer" across all configs.
+
+**Key findings:** `top_k` mattered more than chunk size or loader. Bigger chunks (C) scored worst — more text per chunk dilutes the embedding signal. pdfplumber (D) produced cleaner text but didn't outperform pymupdf on harder questions.
 
 After expanding to 10 questions (including implicit answers, multi-hop, and one unanswerable question), hit rate dropped to **90%** — Q10 (legal contract review) correctly returned "I could not find the answer" because the document doesn't cover it. That's the eval working as intended.
 
