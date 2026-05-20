@@ -98,3 +98,41 @@ Three findings, each surprising:
 **Lesson:** Eval design bugs are indistinguishable from system failures until you do the manual check. Always verify that must_contain keywords actually appear in the document and can co-occur in a single retrievable unit before treating a miss as a system failure.
 
 **Next:** Semantic chunking may still help Q11 if the answer is near a section boundary — but the primary fix is likely a better embedding model or query expansion. Also: add LLM-as-judge as the verification method for multi-hop questions (Q13).
+
+---
+
+## Entry 4 — Does chunking strategy break the 93% ceiling? (Day 6)
+
+**Date:** 2026-05-20
+
+**Prerequisite check:** Manual inspection confirmed 0/2 remaining failing questions (Q5, Q11) span chunk boundaries. Q11's answer is inside chunk 45. Q5's keyword appears in 5 different chunks — a retrieval width issue, not a boundary issue. The chunking hypothesis was already ruled out before running the experiment. Proceeded anyway to (a) build the tooling and (b) test whether semantic chunking improves chunk quality in ways that indirectly help retrieval.
+
+**Hypothesis:** Chunking strategies that respect natural text boundaries (recursive: paragraphs first; semantic: embedding-detected topic shifts) will produce more coherent chunks whose embeddings better match query vectors, lifting the 93% ceiling.
+
+**Method:** Implemented `chunk_text_recursive` in `src/chunker.py` (splits on `\n\n → \n → ". " → " " → ""` with fallback merge) and `chunk_text_semantic` in `src/semantic_chunker.py` (NLTK sentence tokenization → embed all sentences → split where cosine distance exceeds 90th percentile → max_chunk_size fallback). Ran 7 configs: 3 fixed-chunking baselines + 2 recursive + 2 semantic.
+
+**Result:**
+
+| Config | Chunking | Retrieval | Top K | Hit Rate |
+|--------|----------|-----------|-------|----------|
+| fixed_dense | fixed | dense | 3 | 86% |
+| fixed_dense_k6 | fixed | dense | 6 | 93% |
+| fixed_hybrid | fixed | hybrid | 3 | 93% |
+| recur_dense | recursive | dense | 3 | 71% |
+| recur_hybrid | recursive | hybrid | 3 | 93% |
+| sem_dense | semantic | dense | 3 | 93% |
+| sem_hybrid | semantic | hybrid | 3 | 93% |
+
+**Interpretation:**
+
+Three findings:
+
+1. **Semantic chunking at top_k=3 matched fixed chunking at top_k=6.** `sem_dense` reached 93% with just 3 retrieved chunks — the same performance that required top_k=6 or hybrid retrieval with fixed chunks. Semantic chunking creates more topically focused chunks, so each retrieved chunk is more likely to contain the answer. This is the most useful Day 6 result: better chunk quality is a substitute for wider retrieval.
+
+2. **Recursive chunking hurt without hybrid.** `recur_dense` regressed to 71% — worse than the fixed baseline. Recursive splitting on paragraph boundaries redistributed content in ways that fragmented Q7 (SME) and Q12 (leadership) answers across different chunks. `recur_hybrid` recovered to 93% because hybrid retrieval's wider candidate pool compensated. Lesson: recursive chunking is sensitive to paragraph structure in this PDF and needs wider retrieval to be safe.
+
+3. **Q11 fails 0/7 across all chunking strategies.** Confirmed: it is not a chunking problem. The answer exists in a coherent chunk under every strategy. The query vector ("teams respond when use case doesn't perform as expected") simply doesn't land near the answer chunk ("Pivot and Scale... feedback loops to iterate") in `text-embedding-3-small`'s embedding space. Fixing this requires either a better embedding model or query expansion/rewriting at inference time.
+
+**The 93% ceiling is now the correct understanding.** It's not an artifact of fixed chunking — semantic chunking hits the same ceiling. The one remaining miss (Q11) is an embedding gap that retrieval architecture can't fix.
+
+**Next:** Test query expansion for Q11 (rewrite the query to include terms like "iterate", "optimize", "feedback" alongside the question). If that fixes it, the ceiling was always embedding-gap driven. Also: LLM-as-judge for Q13 to replace the keyword-only check.

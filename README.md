@@ -21,7 +21,8 @@ PDF → Chunk → Embed → Retrieve → Generate → Answer
 ```
 ├── src/
 │   ├── loader.py       # PDF loaders (3 options, switchable via config)
-│   ├── chunker.py      # Fixed-size chunking with overlap
+│   ├── chunker.py      # Fixed, recursive, and semantic chunking (dispatcher)
+│   ├── semantic_chunker.py  # Sentence-embedding topic-shift chunker
 │   ├── embedder.py     # OpenAI embeddings
 │   ├── retriever.py    # Cosine similarity retrieval
 │   └── generator.py   # Claude answer generation
@@ -75,19 +76,19 @@ python main.py "Your question here"
 
 ## Eval Results
 
-Five days of experiments across retrieval strategies, plus a manual per-question diagnosis that found 2 of 3 "ceiling" failures were eval design bugs — `must_contain` keywords that could never co-occur in a single chunk regardless of retrieval quality. After correcting those questions, the system runs at 86–93%. One genuine hard failure remains (Q11): the right chunk exists but the query's embedding doesn't reach it — a semantic gap between "use case doesn't perform as expected" and "feedback loops to iterate and optimize."
+Six days of experiments, each eliminating one hypothesis about where the ceiling comes from. Act 1 found an apparent 71–79% ceiling that chunk tuning couldn't move. Act 2 (reranking) lifted confidence scores but not hit rate — a recall problem, not a precision problem. Act 3 (BM25 hybrid) matched the best dense config but didn't improve further — both retrievers found the same questions. Act 4 (chunking): semantic chunking at top_k=3 matched what fixed chunking needed top_k=6 to achieve — better chunk quality is a substitute for wider retrieval. But Q11 failed across all 7 configs. Manual inspection confirmed 0 of the 2 remaining failures span chunk boundaries. The 93% ceiling is real and driven by a single embedding gap: the query "use case doesn't perform as expected" and the answer chunk "feedback loops to iterate and optimize" don't share a vector neighborhood in `text-embedding-3-small`.
 
-| Config | Strategy | Top K | Hit Rate | Avg Score |
+| Config | Chunking | Retrieval | Top K | Hit Rate |
 |---|---|---|---|---|
-| dense_k3 | dense | 3 | 86% | 0.6226 |
-| **dense_k6** | **dense** | **6** | **93%** | **0.6226** |
-| dense_rerank | dense_rerank | 3 | 86% | 0.7856 |
-| **bm25_only** | **bm25_only** | **3** | **93%** | **—** |
-| **hybrid_k3** | **hybrid** | **3** | **93%** | **—** |
-| **hybrid_k6** | **hybrid** | **6** | **93%** | **—** |
-| hybrid_rerank | hybrid_rerank | 3 | 86% | 0.7857 |
+| fixed_dense | fixed | dense | 3 | 86% |
+| fixed_dense_k6 | fixed | dense | 6 | 93% |
+| fixed_hybrid | fixed | hybrid | 3 | 93% |
+| recur_dense | recursive | dense | 3 | 71% |
+| recur_hybrid | recursive | hybrid | 3 | 93% |
+| **sem_dense** | **semantic** | **dense** | **3** | **93%** |
+| sem_hybrid | semantic | hybrid | 3 | 93% |
 
-**Winner:** `dense_k6` / `bm25_only` / `hybrid` (tied at 93%, 13/14). The one remaining miss (Q11) is an embedding-level semantic gap — not fixable by retrieval tuning alone. Reranking hurts when layered on hybrid, dropping to 86%; the cross-encoder isn't calibrated for RRF-fused candidates.
+**Winner:** `sem_dense` — semantic chunking + dense retrieval at top_k=3 = 93%. Same performance as wider retrieval, fewer API calls. Recursive chunking hurt at top_k=3 (content fragmentation) but recovered with hybrid. Q11 fails every config: confirmed embedding gap, not an architecture problem.
 
 ```bash
 python -m evals.run_eval          # single config with generated answers
@@ -108,16 +109,17 @@ Full results in `evals/results/comparison.md`.
 
 **Eval design bugs are indistinguishable from system failures.** What looked like a 71–79% ceiling across 5 days of retrieval experiments turned out to be 2 broken questions — `must_contain` keywords that could never co-occur in a single chunk regardless of any retrieval strategy. The per-question breakdown (not just aggregate hit rate) exposed this immediately. Always verify that your eval keywords actually appear in the document and can co-occur in a retrievable unit before concluding your system has a ceiling.
 
-**Re-ranking improves confidence but not recall.** Adding a cross-encoder (BAAI/bge-reranker-base) lifted avg similarity scores from 0.62 to 0.79 — the model is returning more relevant chunks — but hit rate didn't move. The failing questions aren't being ranked wrong; their answer chunks aren't making it into the top-20 candidate pool at all. The ceiling is a recall problem, not a ranking problem. Next fix: semantic chunking or a stronger embedding model.
+**Re-ranking improves confidence but not recall.** Adding a cross-encoder (BAAI/bge-reranker-base) lifted avg similarity scores from 0.62 to 0.79 — the model is returning more relevant chunks — but hit rate didn't move. The failing questions aren't being ranked wrong; their answer chunks aren't making it into the top-20 candidate pool at all. The ceiling is a recall problem, not a ranking problem.
 
-**BM25 is complementary until it isn't.** BM25 alone matched the best dense config (79%) — lexical matching recovered a question that embedding similarity missed. But hybrid didn't improve beyond 79%, meaning the two retrievers found the same 11 questions when combined. More importantly: hybrid+rerank dropped to 71%. The cross-encoder was not trained to rank fused RRF scores and actively made things worse. Stacking techniques compounds errors when each layer introduces its own failure mode.
+**BM25 is complementary until it isn't.** BM25 alone matched the best dense config — lexical matching recovered a question that embedding similarity missed. But hybrid didn't improve beyond that, meaning both retrievers found the same questions when combined. Hybrid+rerank dropped hit rate: the cross-encoder isn't calibrated for RRF-fused candidates and actively made things worse. Stacking techniques compounds errors when each layer introduces its own failure mode.
+
+**Semantic chunking is a substitute for wider retrieval.** `sem_dense` at top_k=3 matched `fixed_dense` at top_k=6 — more coherent chunks need fewer retrieved candidates to cover the answer. Recursive chunking *hurt* at top_k=3 (fragmented answers across boundaries) but recovered with hybrid. The choice of chunking strategy interacts with retrieval width: better chunks reduce how wide you need to cast the net.
 
 **Negative tests are essential.** The system correctly refused to answer a question the document doesn't cover — across all 5 configs. That's the system prompt doing its job, and you can only verify it with a test designed to produce a miss.
 
 ## What's next
 
+- Fix Q11: query expansion or a stronger embedding model for the semantic gap between "doesn't perform as expected" and "feedback loops to iterate"
 - LLM-as-judge for answer quality — keyword hit rate can't verify multi-hop reasoning (Q13)
-- Fix Q11: investigate query expansion or a stronger embedding model for the semantic gap
 - Add proper retrieval metrics (Recall@k, MRR) beyond keyword hit rate
 - Add ChromaDB or FAISS to persist embeddings across runs
-- Implement recursive/semantic chunking and compare against fixed chunking

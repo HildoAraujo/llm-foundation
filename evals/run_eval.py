@@ -56,11 +56,15 @@ def run_eval(config: dict, questions: list[dict], generate: bool = True) -> dict
 
     text = load_pdf_text(pdf_path, loader_type=config.get("loader", "pymupdf"))
 
+    chunking_cfg = config.get("chunking", {})
     chunks = chunk_text(
         text=text,
-        strategy=config["chunking"]["strategy"],
-        size=config["chunking"]["size"],
-        overlap=config["chunking"]["overlap"],
+        strategy=chunking_cfg.get("strategy", "fixed"),
+        size=chunking_cfg.get("size", 500),
+        overlap=chunking_cfg.get("overlap", 50),
+        embedding_model=config.get("embedding_model", "text-embedding-3-small"),
+        breakpoint_percentile=chunking_cfg.get("breakpoint_percentile", 90.0),
+        max_chunk_size=chunking_cfg.get("max_chunk_size", 2000),
     )
 
     embeddings = None

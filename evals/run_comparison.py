@@ -7,7 +7,6 @@ from evals.run_eval import load_questions, run_eval
 _BASE = {
     "pdf_path": "data/Identifying and Scaling AI Use Cases.pdf",
     "loader": "pymupdf",
-    "chunking": {"strategy": "fixed", "size": 500, "overlap": 50},
     "embedding_model": "text-embedding-3-small",
     "generation_model": "claude-sonnet-4-6",
     "max_tokens": 500,
@@ -15,16 +14,21 @@ _BASE = {
     "rerank_model": "BAAI/bge-reranker-base",
 }
 
+_FIXED   = {"strategy": "fixed",     "size": 500, "overlap": 50}
+_RECUR   = {"strategy": "recursive", "size": 500, "overlap": 50}
+_SEMANT  = {"strategy": "semantic",  "max_chunk_size": 2000, "breakpoint_percentile": 90.0}
+
 CONFIGS = [
-    # Day 3/4 baselines (dense only)
-    {**_BASE, "name": "dense_k3",      "strategy": "dense",        "top_k": 3},
-    {**_BASE, "name": "dense_k6",      "strategy": "dense",        "top_k": 6},
-    {**_BASE, "name": "dense_rerank",  "strategy": "dense_rerank", "top_k": 3},
-    # Day 5 — BM25 and hybrid
-    {**_BASE, "name": "bm25_only",     "strategy": "bm25_only",    "top_k": 3},
-    {**_BASE, "name": "hybrid_k3",     "strategy": "hybrid",       "top_k": 3},
-    {**_BASE, "name": "hybrid_k6",     "strategy": "hybrid",       "top_k": 6},
-    {**_BASE, "name": "hybrid_rerank", "strategy": "hybrid_rerank","top_k": 3},
+    # Days 3-5 baselines (fixed chunking)
+    {**_BASE, "name": "fixed_dense",   "chunking": _FIXED,  "strategy": "dense",   "top_k": 3},
+    {**_BASE, "name": "fixed_dense_k6","chunking": _FIXED,  "strategy": "dense",   "top_k": 6},
+    {**_BASE, "name": "fixed_hybrid",  "chunking": _FIXED,  "strategy": "hybrid",  "top_k": 3},
+    # Day 6 — recursive chunking
+    {**_BASE, "name": "recur_dense",   "chunking": _RECUR,  "strategy": "dense",   "top_k": 3},
+    {**_BASE, "name": "recur_hybrid",  "chunking": _RECUR,  "strategy": "hybrid",  "top_k": 3},
+    # Day 6 — semantic chunking
+    {**_BASE, "name": "sem_dense",     "chunking": _SEMANT, "strategy": "dense",   "top_k": 3},
+    {**_BASE, "name": "sem_hybrid",    "chunking": _SEMANT, "strategy": "hybrid",  "top_k": 3},
 ]
 
 
@@ -36,8 +40,8 @@ def run_comparison(
     # q_pass[question_id][config_name] = passed
     q_pass: dict[int, dict[str, bool]] = {q["id"]: {} for q in questions}
 
-    print(f"\n{'Config':<20} {'Strategy':<16} {'Top K':>6} {'Hits':>8} {'Hit Rate':>10} {'Avg Score':>11}")
-    print("-" * 78)
+    print(f"\n{'Config':<20} {'Chunking':<12} {'Retrieval':<16} {'Top K':>6} {'Hits':>8} {'Hit Rate':>10} {'Avg Score':>11}")
+    print("-" * 88)
 
     for cfg in CONFIGS:
         results = run_eval(cfg, questions, generate=False)
@@ -47,11 +51,12 @@ def run_comparison(
         for r in results["results"]:
             q_pass[r["id"]][cfg["name"]] = r["passed"]
 
+        chunking_strat = cfg["chunking"]["strategy"]
         row = {
             "name": cfg["name"],
+            "chunking": chunking_strat,
             "strategy": cfg.get("strategy", "dense"),
-            "chunk_size": cfg["chunking"]["size"],
-            "overlap": cfg["chunking"]["overlap"],
+            "chunk_size": cfg["chunking"].get("size", "—"),
             "top_k": cfg["top_k"],
             "hits": results["hits"],
             "total": results["total_questions"],
@@ -61,7 +66,7 @@ def run_comparison(
         rows.append(row)
 
         print(
-            f"{cfg['name']:<20} {cfg.get('strategy', 'dense'):<16} {cfg['top_k']:>6} "
+            f"{cfg['name']:<20} {chunking_strat:<12} {cfg.get('strategy', 'dense'):<16} {cfg['top_k']:>6} "
             f"{results['hits']:>4}/{results['total_questions']:<3} "
             f"{results['hit_rate']:>9.0%} {avg_score:>10.4f}"
         )
@@ -108,11 +113,11 @@ def write_markdown(
     lines.append(f"Questions: {rows[0]['total']} | Embedding: text-embedding-3-small | Loader: pymupdf\n")
 
     # Summary table
-    lines.append("| Config | Strategy | Top K | Hit Rate | Avg Top Score |")
-    lines.append("|--------|----------|-------|----------|---------------|")
+    lines.append("| Config | Chunking | Retrieval | Top K | Hit Rate | Avg Top Score |")
+    lines.append("|--------|----------|-----------|-------|----------|---------------|")
     for r in rows:
         lines.append(
-            f"| {r['name']} | {r['strategy']} | {r['top_k']} "
+            f"| {r['name']} | {r['chunking']} | {r['strategy']} | {r['top_k']} "
             f"| {r['hit_rate']:.0%} | {r['avg_score']:.4f} |"
         )
 
