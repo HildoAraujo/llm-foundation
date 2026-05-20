@@ -74,21 +74,23 @@ python main.py "Your question here"
 
 ## Eval Results
 
-Day 3 revealed a 71% hit-rate ceiling that chunk size and overlap tuning couldn't break. I hypothesized this was an embedding-model limit — bi-encoders compress meaning into a single vector before comparing, losing precision on implicit and multi-hop questions — and tested it by adding a cross-encoder re-ranker (BAAI/bge-reranker-base). Result: reranking lifted avg similarity scores from 0.62 to 0.79 but left hit rate unchanged at 71–79%. The bottleneck isn't ordering — the right chunks aren't making it into the 20-candidate pool at all. The ceiling is a recall problem, not a ranking problem.
+Three days of experiments, each testing a specific hypothesis about where the 79% ceiling comes from. Day 3 found the ceiling and ruled out chunking as the cause. Day 4 added a cross-encoder reranker — avg confidence scores jumped from 0.62 to 0.79 but hit rate didn't move, ruling out ranking as the cause. Day 5 added BM25 hybrid retrieval: BM25 alone matched the best dense config (79%), hybrid didn't improve further, and hybrid+rerank *dropped* to 71% — the cross-encoder actively mis-ranks when layered on fused results. The 79% ceiling appears to be a hard limit of fixed chunking: the 3 failing questions require understanding across chunk boundaries that neither lexical nor semantic retrieval can bridge with 500-character chunks.
 
-| Config | Chunk | Overlap | Top K | Rerank | Hit Rate | Avg Score |
-|---|---|---|---|---|---|---|
-| baseline | 500 | 50 | 3 | no | 71% | 0.6226 |
-| **wider_retrieval** | **500** | **50** | **6** | **no** | **79%** | **0.6226** |
-| rerank_k3_from_20 | 500 | 50 | 3 | yes | 71% | 0.7856 |
-| **rerank_k6_from_20** | **500** | **50** | **6** | **yes** | **79%** | **0.7856** |
-| rerank_k3_from_50 | 500 | 50 | 3 | yes | 71% | 0.7866 |
+| Config | Strategy | Top K | Hit Rate | Avg Score |
+|---|---|---|---|---|
+| dense_k3 | dense | 3 | 71% | 0.6226 |
+| **dense_k6** | **dense** | **6** | **79%** | **0.6226** |
+| dense_rerank | dense_rerank | 3 | 71% | 0.7856 |
+| **bm25_only** | **bm25_only** | **3** | **79%** | **—** |
+| **hybrid_k3** | **hybrid** | **3** | **79%** | **—** |
+| **hybrid_k6** | **hybrid** | **6** | **79%** | **—** |
+| hybrid_rerank | hybrid_rerank | 3 | 71% | 0.7857 |
 
-**Winner:** `rerank_k6_from_20` (top_k=6, initial_k=20, cross-encoder rerank). Reranking is the right move for production — higher confidence scores, better answer quality — but it doesn't fix the recall ceiling. That requires better chunking or a stronger embedding model.
+**Winner:** `bm25_only` / `hybrid` (tied at 79%). Surprising finding: BM25 alone matched the best dense config and hybrid didn't add anything — the two retrievers are hitting the same 11 questions. The cross-encoder hurts when layered on hybrid, dropping back to 71%. Next fix: semantic chunking that respects document structure.
 
 ```bash
 python -m evals.run_eval          # single config with generated answers
-python evals/run_comparison.py    # 5-config sweep (includes reranker)
+python evals/run_comparison.py    # 7-config sweep across Days 3-5
 ```
 
 Full results in `evals/results/comparison.md`.
@@ -106,6 +108,8 @@ Full results in `evals/results/comparison.md`.
 **Five configs all hit a ceiling at 71%.** Every chunk size and overlap variation stalled at the same floor. Only `top_k=6` broke through to 79% — meaning retrieval width mattered, but configuration tuning alone couldn't push further. That's a signal the bottleneck is below the retrieval layer, likely at the embedding level: cosine similarity can't distinguish closely related concepts in a dense document, and no chunk size fixes that. The 71% ceiling is the next problem to solve.
 
 **Re-ranking improves confidence but not recall.** Adding a cross-encoder (BAAI/bge-reranker-base) lifted avg similarity scores from 0.62 to 0.79 — the model is returning more relevant chunks — but hit rate didn't move. The failing questions aren't being ranked wrong; their answer chunks aren't making it into the top-20 candidate pool at all. The ceiling is a recall problem, not a ranking problem. Next fix: semantic chunking or a stronger embedding model.
+
+**BM25 is complementary until it isn't.** BM25 alone matched the best dense config (79%) — lexical matching recovered a question that embedding similarity missed. But hybrid didn't improve beyond 79%, meaning the two retrievers found the same 11 questions when combined. More importantly: hybrid+rerank dropped to 71%. The cross-encoder was not trained to rank fused RRF scores and actively made things worse. Stacking techniques compounds errors when each layer introduces its own failure mode.
 
 **Negative tests are essential.** The system correctly refused to answer a question the document doesn't cover — across all 5 configs. That's the system prompt doing its job, and you can only verify it with a test designed to produce a miss.
 

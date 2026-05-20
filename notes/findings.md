@@ -27,3 +27,39 @@ Science journal for the RAG pipeline project. Each entry: hypothesis, method, re
 **What would fix it:** Semantic or recursive chunking (chunks that respect document structure rather than fixed character counts) could place answer content in retrievable units. A stronger embedding model (e.g. text-embedding-3-large, or a domain-tuned model) could improve recall on implicit and multi-hop questions. Worth testing next.
 
 **Note on CPU latency:** On Apple Silicon CPU, each reranker pass over 20 candidates took ~1–2 seconds per question. Full sweep of 3 reranker configs × 14 questions ≈ 1–2 minutes. Production systems run cross-encoders on GPU or use API-based rerankers (Cohere Rerank). Not a bottleneck for offline evals but would be for real-time use.
+
+---
+
+## Entry 2 — Does hybrid retrieval (BM25 + dense + RRF) break the 79% ceiling?
+
+**Date:** 2026-05-20
+
+**Hypothesis:** The 3 questions that all dense configs miss require lexical overlap that embedding similarity loses. BM25 ranks by term frequency weighted by inverse document frequency — it should recover questions containing exact proper nouns (BBVA, two-page) or specific numbers that embeddings blur into semantic neighborhoods.
+
+**Method:** Added `src/bm25_retriever.py` (rank-bm25, simple lowercase + punctuation-strip tokenizer) and `src/hybrid_retriever.py` (RRF fusion with k=60). Tested 4 new configs: bm25_only (diagnostic), hybrid_k3, hybrid_k6, hybrid_rerank. All use chunk=500, overlap=50.
+
+**Result:**
+
+| Config | Strategy | Top K | Hit Rate |
+|--------|----------|-------|----------|
+| dense_k3 | dense | 3 | 71% |
+| dense_k6 | dense | 6 | 79% |
+| dense_rerank | dense_rerank | 3 | 71% |
+| bm25_only | bm25_only | 3 | 79% |
+| hybrid_k3 | hybrid | 3 | 79% |
+| hybrid_k6 | hybrid | 6 | 79% |
+| hybrid_rerank | hybrid_rerank | 3 | 71% |
+
+**Interpretation:**
+
+Three findings, each surprising:
+
+1. **BM25 alone hit 79%.** It matched the best dense config without embeddings. This confirms BM25 is recovering at least one question that dense misses — likely a lexically specific question where the exact term appears in the document.
+
+2. **Hybrid didn't improve beyond 79%.** Both retrievers find the same 11 questions. The 3 failing questions are hard for both BM25 and dense — they require understanding that neither term frequency nor cosine similarity can bridge with 500-char chunks. This is a chunking problem, not a retriever problem.
+
+3. **hybrid_rerank dropped to 71%.** The cross-encoder actively hurt when layered on RRF-fused results. Most likely cause: BAAI/bge-reranker-base was not trained on documents structured like this, and RRF scores are on a different scale (~0.03) than the pairs it was trained to rank. It's re-ranking noise. Lesson: stacking retrieval techniques compounds errors unless each layer is calibrated to the previous layer's output distribution.
+
+**What would fix it:** Semantic or recursive chunking (e.g. splitting at paragraph/section boundaries) would keep multi-sentence answers in the same chunk. The 3 failing questions likely have their answer spread across a chunk boundary. No retriever can fix that — it's a document representation problem.
+
+**Next:** Implement recursive character text splitter (LangChain-style) or section-aware chunking. Compare against fixed chunking on the same 14 questions.

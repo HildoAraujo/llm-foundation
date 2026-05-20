@@ -1,12 +1,13 @@
 import json
 import yaml
 from datetime import datetime, timezone
-from typing import List
 
 from src.loader import load_pdf_text
 from src.chunker import chunk_text
 from src.embedder import embed_text
 from src.retriever import retrieve, retrieve_with_rerank
+from src.bm25_retriever import build_bm25_index, bm25_retrieve
+from src.hybrid_retriever import hybrid_retrieve, hybrid_retrieve_rerank
 from src.generator import generate_answer
 
 
@@ -37,25 +38,38 @@ def check_hit(retrieved_chunks: list[str], must_contain: list[str]) -> bool:
     return False
 
 
+def _get_strategy(config: dict) -> str:
+    if "strategy" in config:
+        return config["strategy"]
+    # Legacy fallback for Day 3/4 configs using rerank dict
+    if config.get("rerank", {}).get("enabled"):
+        return "dense_rerank"
+    return "dense"
+
+
 def run_eval(config: dict, questions: list[dict], generate: bool = True) -> dict:
     pdf_path = config["pdf_path"]
+    strategy = _get_strategy(config)
+    top_k = config["top_k"]
+    initial_top_k = config.get("initial_top_k", 20)
+    rerank_model = config.get("rerank_model", "BAAI/bge-reranker-base")
 
-    text = load_pdf_text(
-        pdf_path,
-        loader_type=config.get("loader", "pymupdf")
-    )
+    text = load_pdf_text(pdf_path, loader_type=config.get("loader", "pymupdf"))
 
     chunks = chunk_text(
         text=text,
         strategy=config["chunking"]["strategy"],
         size=config["chunking"]["size"],
-        overlap=config["chunking"]["overlap"]
+        overlap=config["chunking"]["overlap"],
     )
 
-    embeddings = embed_text(
-        chunks,
-        model=config["embedding_model"]
-    )
+    embeddings = None
+    if strategy != "bm25_only":
+        embeddings = embed_text(chunks, model=config["embedding_model"])
+
+    bm25_index = None
+    if strategy in ("bm25_only", "hybrid", "hybrid_rerank"):
+        bm25_index = build_bm25_index(chunks)
 
     results = []
     hits = 0
@@ -66,25 +80,41 @@ def run_eval(config: dict, questions: list[dict], generate: bool = True) -> dict
         must_contain = q["must_contain"]
         expected_outcome = q.get("expected_outcome", "hit")
 
-        rerank_cfg = config.get("rerank", {})
-        if rerank_cfg.get("enabled", False):
+        if strategy == "dense":
+            retrieval_result = retrieve(
+                query=question_text, chunks=chunks, embeddings=embeddings,
+                top_k=top_k, embedding_model=config["embedding_model"],
+            )
+        elif strategy == "dense_rerank":
+            legacy_rerank = config.get("rerank", {})
             retrieval_result = retrieve_with_rerank(
-                query=question_text,
-                chunks=chunks,
-                embeddings=embeddings,
-                initial_top_k=rerank_cfg["initial_top_k"],
-                final_top_k=config["top_k"],
-                rerank_model=rerank_cfg["model"],
+                query=question_text, chunks=chunks, embeddings=embeddings,
+                initial_top_k=legacy_rerank.get("initial_top_k", initial_top_k),
+                final_top_k=top_k,
+                rerank_model=legacy_rerank.get("model", rerank_model),
                 embedding_model=config["embedding_model"],
+            )
+        elif strategy == "bm25_only":
+            indices, scores = bm25_retrieve(question_text, chunks, bm25_index, top_k=top_k)
+            retrieval_result = {
+                "chunks": [chunks[i] for i in indices],
+                "chunk_ids": indices,
+                "scores": scores,
+            }
+        elif strategy == "hybrid":
+            retrieval_result = hybrid_retrieve(
+                query=question_text, chunks=chunks, embeddings=embeddings,
+                bm25_index=bm25_index, initial_top_k=initial_top_k, final_top_k=top_k,
+                embedding_model=config["embedding_model"],
+            )
+        elif strategy == "hybrid_rerank":
+            retrieval_result = hybrid_retrieve_rerank(
+                query=question_text, chunks=chunks, embeddings=embeddings,
+                bm25_index=bm25_index, initial_top_k=initial_top_k, final_top_k=top_k,
+                embedding_model=config["embedding_model"], rerank_model=rerank_model,
             )
         else:
-            retrieval_result = retrieve(
-                query=question_text,
-                chunks=chunks,
-                embeddings=embeddings,
-                top_k=config["top_k"],
-                embedding_model=config["embedding_model"],
-            )
+            raise ValueError(f"Unknown strategy: {strategy}")
 
         retrieved_chunks = retrieval_result["chunks"]
         retrieved_ids = retrieval_result["chunk_ids"]

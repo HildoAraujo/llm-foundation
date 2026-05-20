@@ -11,21 +11,20 @@ _BASE = {
     "embedding_model": "text-embedding-3-small",
     "generation_model": "claude-sonnet-4-6",
     "max_tokens": 500,
+    "initial_top_k": 20,
+    "rerank_model": "BAAI/bge-reranker-base",
 }
 
-_RERANK_MODEL = "BAAI/bge-reranker-base"
-
 CONFIGS = [
-    # Day 3 baselines
-    {**_BASE, "name": "baseline",        "top_k": 3, "rerank": {"enabled": False}},
-    {**_BASE, "name": "wider_retrieval", "top_k": 6, "rerank": {"enabled": False}},
-    # Day 4 — reranker variants
-    {**_BASE, "name": "rerank_k3_from_20", "top_k": 3,
-     "rerank": {"enabled": True, "model": _RERANK_MODEL, "initial_top_k": 20}},
-    {**_BASE, "name": "rerank_k6_from_20", "top_k": 6,
-     "rerank": {"enabled": True, "model": _RERANK_MODEL, "initial_top_k": 20}},
-    {**_BASE, "name": "rerank_k3_from_50", "top_k": 3,
-     "rerank": {"enabled": True, "model": _RERANK_MODEL, "initial_top_k": 50}},
+    # Day 3/4 baselines (dense only)
+    {**_BASE, "name": "dense_k3",      "strategy": "dense",        "top_k": 3},
+    {**_BASE, "name": "dense_k6",      "strategy": "dense",        "top_k": 6},
+    {**_BASE, "name": "dense_rerank",  "strategy": "dense_rerank", "top_k": 3},
+    # Day 5 — BM25 and hybrid
+    {**_BASE, "name": "bm25_only",     "strategy": "bm25_only",    "top_k": 3},
+    {**_BASE, "name": "hybrid_k3",     "strategy": "hybrid",       "top_k": 3},
+    {**_BASE, "name": "hybrid_k6",     "strategy": "hybrid",       "top_k": 6},
+    {**_BASE, "name": "hybrid_rerank", "strategy": "hybrid_rerank","top_k": 3},
 ]
 
 
@@ -33,8 +32,8 @@ def run_comparison(questions_path: str = "evals/questions.json") -> list[dict]:
     questions = load_questions(questions_path)
     rows = []
 
-    print(f"\n{'Config':<20} {'Chunk':>6} {'Overlap':>8} {'Top K':>6} {'Hits':>8} {'Hit Rate':>10} {'Avg Score':>11}")
-    print("-" * 75)
+    print(f"\n{'Config':<20} {'Strategy':<16} {'Top K':>6} {'Hits':>8} {'Hit Rate':>10} {'Avg Score':>11}")
+    print("-" * 78)
 
     for cfg in CONFIGS:
         results = run_eval(cfg, questions, generate=False)
@@ -43,10 +42,10 @@ def run_comparison(questions_path: str = "evals/questions.json") -> list[dict]:
 
         row = {
             "name": cfg["name"],
+            "strategy": cfg.get("strategy", "dense"),
             "chunk_size": cfg["chunking"]["size"],
             "overlap": cfg["chunking"]["overlap"],
             "top_k": cfg["top_k"],
-            "rerank": cfg.get("rerank", {}).get("enabled", False),
             "hits": results["hits"],
             "total": results["total_questions"],
             "hit_rate": results["hit_rate"],
@@ -55,8 +54,8 @@ def run_comparison(questions_path: str = "evals/questions.json") -> list[dict]:
         rows.append(row)
 
         print(
-            f"{cfg['name']:<20} {cfg['chunking']['size']:>6} {cfg['chunking']['overlap']:>8} "
-            f"{cfg['top_k']:>6} {results['hits']:>4}/{results['total_questions']:<3} "
+            f"{cfg['name']:<20} {cfg.get('strategy', 'dense'):<16} {cfg['top_k']:>6} "
+            f"{results['hits']:>4}/{results['total_questions']:<3} "
             f"{results['hit_rate']:>9.0%} {avg_score:>10.4f}"
         )
 
@@ -71,14 +70,13 @@ def run_comparison(questions_path: str = "evals/questions.json") -> list[dict]:
 def write_markdown(rows: list[dict], path: str = "evals/results/comparison.md") -> None:
     lines = ["# Config Comparison\n"]
     lines.append(f"Questions: {rows[0]['total']} | Embedding: text-embedding-3-small | Loader: pymupdf\n")
-    lines.append("| Config | Chunk | Overlap | Top K | Rerank | Hit Rate | Avg Top Score |")
-    lines.append("|--------|-------|---------|-------|--------|----------|---------------|")
+    lines.append("| Config | Strategy | Top K | Hit Rate | Avg Top Score |")
+    lines.append("|--------|----------|-------|----------|---------------|")
 
     for r in rows:
-        rerank_flag = "yes" if r.get("rerank") else "no"
         lines.append(
-            f"| {r['name']} | {r['chunk_size']} | {r['overlap']} | {r['top_k']} "
-            f"| {rerank_flag} | {r['hit_rate']:.0%} | {r['avg_score']:.4f} |"
+            f"| {r['name']} | {r['strategy']} | {r['top_k']} "
+            f"| {r['hit_rate']:.0%} | {r['avg_score']:.4f} |"
         )
 
     best = max(rows, key=lambda r: (r["hit_rate"], r["avg_score"]))

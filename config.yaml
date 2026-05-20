@@ -9,14 +9,10 @@ chunking:
 embedding_model: "text-embedding-3-small"
 
 retrieval:
+  strategy: "hybrid_rerank"   # dense | bm25_only | hybrid | dense_rerank | hybrid_rerank
   top_k: 3
-  rerank:
-    enabled: true
-    model: "BAAI/bge-reranker-base"
-    initial_top_k: 20
-
-# legacy key kept for run_eval.py compatibility
-top_k: 3
+  initial_top_k: 20
+  rerank_model: "BAAI/bge-reranker-base"
 
 generation_model: "claude-sonnet-4-6"
 max_tokens: 500
