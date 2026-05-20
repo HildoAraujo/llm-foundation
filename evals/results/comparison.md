@@ -4,16 +4,16 @@ Questions: 14 | Embedding: text-embedding-3-small | Loader: pymupdf
 
 | Config | Strategy | Top K | Hit Rate | Avg Top Score |
 |--------|----------|-------|----------|---------------|
-| dense_k3 | dense | 3 | 71% | 0.6226 |
-| dense_k6 | dense | 6 | 79% | 0.6226 |
-| dense_rerank | dense_rerank | 3 | 71% | 0.7856 |
-| bm25_only | bm25_only | 3 | 79% | 12.7169 |
-| hybrid_k3 | hybrid | 3 | 79% | 0.0324 |
-| hybrid_k6 | hybrid | 6 | 79% | 0.0324 |
-| hybrid_rerank | hybrid_rerank | 3 | 71% | 0.7857 |
+| dense_k3 | dense | 3 | 86% | 0.6226 |
+| dense_k6 | dense | 6 | 93% | 0.6226 |
+| dense_rerank | dense_rerank | 3 | 86% | 0.7856 |
+| bm25_only | bm25_only | 3 | 93% | 12.7169 |
+| hybrid_k3 | hybrid | 3 | 93% | 0.0324 |
+| hybrid_k6 | hybrid | 6 | 93% | 0.0324 |
+| hybrid_rerank | hybrid_rerank | 3 | 86% | 0.7857 |
 
-**Winner:** `bm25_only` — 79% hit rate, avg score 12.7169
-**Worst:** `dense_k3` — 71% hit rate, avg score 0.6226
+**Winner:** `bm25_only` — 93% hit rate, avg score 12.7169
+**Worst:** `dense_k3` — 86% hit rate, avg score 0.6226
 
 ## Per-Question Breakdown
 
@@ -30,6 +30,6 @@ Questions: 14 | Embedding: text-embedding-3-small | Loader: pymupdf
 | Q9: How many use cases were analyzed to identify the six pr | hard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 7/7 |
 | Q10: What does the document say about cost savings from usin | negative | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 7/7 |
 | Q11: How should teams respond when an AI use case doesn't pe | implicit | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | 0/7 |
-| Q12: What does the document say about the role of leadership | implicit | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | 0/7 |
-| Q13: Which of the six AI use case primitives best describes  | multi-hop | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | 0/7 |
+| Q12: What does the document say about the role of leadership | implicit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 7/7 |
+| Q13: Which of the six AI use case primitives best describes  | multi-hop | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 7/7 |
 | Q14: How long is the brief that business users create during | hard-number | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 7/7 |

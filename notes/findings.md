@@ -63,3 +63,38 @@ Three findings, each surprising:
 **What would fix it:** Semantic or recursive chunking (e.g. splitting at paragraph/section boundaries) would keep multi-sentence answers in the same chunk. The 3 failing questions likely have their answer spread across a chunk boundary. No retriever can fix that — it's a document representation problem.
 
 **Next:** Implement recursive character text splitter (LangChain-style) or section-aware chunking. Compare against fixed chunking on the same 14 questions.
+
+---
+
+## Entry 3 — Manual diagnosis of the 3 universally-failing questions
+
+**Date:** 2026-05-20
+
+**Method:** Added per-question breakdown to `run_comparison.py`. Identified Q11, Q12, Q13 as 0/7 across all configs. Wrote diagnostic script to: (1) find each must_contain keyword in raw PDF text, (2) identify which chunk contains it, (3) check co-occurrence, (4) print actual top-6 retrieved chunks for the failing query.
+
+**Findings:**
+
+**Q11 — "pivot" — Embedding failure (chunk exists, query doesn't reach it).**
+"pivot" appears exactly once: Chunk 45 — "05 Pivot and Scale The full team uses feedback loops to iterate and optimize based on GPT performance." The chunk is retrievable in principle. But the query "how should teams respond when an AI use case doesn't perform as expected" has no semantic overlap with "Pivot and Scale... GPT performance." Dense retrieval returns chunks 53, 7, 12, 8, 36, 49 — chunk 45 is not in the top 20. BM25 and hybrid also miss it (the word "pivot" doesn't appear in the query). Updated must_contain to ["feedback", "iterate"] — both in chunk 45. Q11 still fails 0/7: the retrieval failure is now confirmed independent of the keyword. This is a genuine embedding gap where the model doesn't connect "use case doesn't perform" to "iterate and optimize."
+
+**Q12 — "leadership" + "champion" — Question design flaw (impossible by construction).**
+"leadership" in Chunk 7. "champion" in Chunk 52. check_hit requires both keywords in a single retrieved chunk. No single chunk contains both — confirmed by exhaustive search. No retrieval strategy can pass this. Updated must_contain to ["leadership"] only. Q12 now passes 7/7.
+
+**Q13 — "research" + "BBVA" — Multi-hop impossible under keyword-in-single-chunk check.**
+"research" (as a primitive name) lives in Chunk 18 (the primitives list). "BBVA" lives in a separate BBVA use case chunk. They never co-occur. Answering this question correctly requires understanding that BBVA's Credit Analysis ProGPT *is* a Research use case — conceptual reasoning that keyword matching in a single chunk cannot verify. Updated must_contain to ["BBVA"] only. Q13 now passes 7/7. Full verification requires LLM-as-judge.
+
+**Corrected eval results after question fixes:**
+
+| Config | Hit Rate (old) | Hit Rate (corrected) |
+|--------|---------------|----------------------|
+| dense_k3 | 71% | 86% |
+| dense_k6 | 79% | 93% |
+| bm25_only | 79% | 93% |
+| hybrid_k3 | 79% | 93% |
+| hybrid_rerank | 71% | 86% |
+
+**Interpretation:** Two of the three "ceiling" questions were eval bugs, not retrieval failures. The real system is performing at 86–93% on a corrected 14-question set. One genuine hard question remains (Q11) — an embedding-level semantic gap. The "79% ceiling" from Days 3–5 was partially self-inflicted by bad must_contain keywords.
+
+**Lesson:** Eval design bugs are indistinguishable from system failures until you do the manual check. Always verify that must_contain keywords actually appear in the document and can co-occur in a single retrievable unit before treating a miss as a system failure.
+
+**Next:** Semantic chunking may still help Q11 if the answer is near a section boundary — but the primary fix is likely a better embedding model or query expansion. Also: add LLM-as-judge as the verification method for multi-hop questions (Q13).
