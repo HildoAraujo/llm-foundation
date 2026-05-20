@@ -1,6 +1,3 @@
-import re
-
-import nltk
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -8,6 +5,7 @@ from src.embedder import embed_text
 
 
 def _sentences(text: str) -> list[str]:
+    import nltk  # runtime import — installed in Anaconda, not in .venv
     try:
         return [s.strip() for s in nltk.sent_tokenize(text) if s.strip()]
     except LookupError:
@@ -53,7 +51,7 @@ def chunk_text_semantic(
     # Enforce max_chunk_size — a uniformly-topiced doc would otherwise
     # produce one giant chunk if all distances are below the threshold.
     if max_chunk_size:
-        from src.chunker import chunk_text_recursive
+        from src.chunker import chunk_text_recursive  # type: ignore[attr-defined]
         final: list[str] = []
         for chunk in chunks:
             if len(chunk) > max_chunk_size:
