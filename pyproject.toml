@@ -20,6 +20,5 @@ dependencies = [
 ]
 
 [tool.pyright]
-venvPath = "."
-venv = ".venv"
+pythonPath = "/opt/anaconda3/bin/python"
 pythonVersion = "3.13"
