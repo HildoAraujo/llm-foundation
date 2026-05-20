@@ -4,57 +4,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from evals.run_eval import load_questions, run_eval
 
+_BASE = {
+    "pdf_path": "data/Identifying and Scaling AI Use Cases.pdf",
+    "loader": "pymupdf",
+    "chunking": {"strategy": "fixed", "size": 500, "overlap": 50},
+    "embedding_model": "text-embedding-3-small",
+    "generation_model": "claude-sonnet-4-6",
+    "max_tokens": 500,
+}
+
+_RERANK_MODEL = "BAAI/bge-reranker-base"
+
 CONFIGS = [
-    {
-        "name": "baseline",
-        "pdf_path": "data/Identifying and Scaling AI Use Cases.pdf",
-        "loader": "pymupdf",
-        "chunking": {"strategy": "fixed", "size": 500, "overlap": 50},
-        "embedding_model": "text-embedding-3-small",
-        "top_k": 3,
-        "generation_model": "claude-sonnet-4-6",
-        "max_tokens": 500,
-    },
-    {
-        "name": "wider_retrieval",
-        "pdf_path": "data/Identifying and Scaling AI Use Cases.pdf",
-        "loader": "pymupdf",
-        "chunking": {"strategy": "fixed", "size": 500, "overlap": 50},
-        "embedding_model": "text-embedding-3-small",
-        "top_k": 6,
-        "generation_model": "claude-sonnet-4-6",
-        "max_tokens": 500,
-    },
-    {
-        "name": "larger_chunks",
-        "pdf_path": "data/Identifying and Scaling AI Use Cases.pdf",
-        "loader": "pymupdf",
-        "chunking": {"strategy": "fixed", "size": 1000, "overlap": 100},
-        "embedding_model": "text-embedding-3-small",
-        "top_k": 3,
-        "generation_model": "claude-sonnet-4-6",
-        "max_tokens": 500,
-    },
-    {
-        "name": "smaller_chunks",
-        "pdf_path": "data/Identifying and Scaling AI Use Cases.pdf",
-        "loader": "pymupdf",
-        "chunking": {"strategy": "fixed", "size": 250, "overlap": 25},
-        "embedding_model": "text-embedding-3-small",
-        "top_k": 6,
-        "generation_model": "claude-sonnet-4-6",
-        "max_tokens": 500,
-    },
-    {
-        "name": "no_overlap",
-        "pdf_path": "data/Identifying and Scaling AI Use Cases.pdf",
-        "loader": "pymupdf",
-        "chunking": {"strategy": "fixed", "size": 500, "overlap": 0},
-        "embedding_model": "text-embedding-3-small",
-        "top_k": 3,
-        "generation_model": "claude-sonnet-4-6",
-        "max_tokens": 500,
-    },
+    # Day 3 baselines
+    {**_BASE, "name": "baseline",        "top_k": 3, "rerank": {"enabled": False}},
+    {**_BASE, "name": "wider_retrieval", "top_k": 6, "rerank": {"enabled": False}},
+    # Day 4 — reranker variants
+    {**_BASE, "name": "rerank_k3_from_20", "top_k": 3,
+     "rerank": {"enabled": True, "model": _RERANK_MODEL, "initial_top_k": 20}},
+    {**_BASE, "name": "rerank_k6_from_20", "top_k": 6,
+     "rerank": {"enabled": True, "model": _RERANK_MODEL, "initial_top_k": 20}},
+    {**_BASE, "name": "rerank_k3_from_50", "top_k": 3,
+     "rerank": {"enabled": True, "model": _RERANK_MODEL, "initial_top_k": 50}},
 ]
 
 
@@ -75,6 +46,7 @@ def run_comparison(questions_path: str = "evals/questions.json") -> list[dict]:
             "chunk_size": cfg["chunking"]["size"],
             "overlap": cfg["chunking"]["overlap"],
             "top_k": cfg["top_k"],
+            "rerank": cfg.get("rerank", {}).get("enabled", False),
             "hits": results["hits"],
             "total": results["total_questions"],
             "hit_rate": results["hit_rate"],
@@ -99,13 +71,14 @@ def run_comparison(questions_path: str = "evals/questions.json") -> list[dict]:
 def write_markdown(rows: list[dict], path: str = "evals/results/comparison.md") -> None:
     lines = ["# Config Comparison\n"]
     lines.append(f"Questions: {rows[0]['total']} | Embedding: text-embedding-3-small | Loader: pymupdf\n")
-    lines.append("| Config | Chunk | Overlap | Top K | Hit Rate | Avg Top Score |")
-    lines.append("|--------|-------|---------|-------|----------|---------------|")
+    lines.append("| Config | Chunk | Overlap | Top K | Rerank | Hit Rate | Avg Top Score |")
+    lines.append("|--------|-------|---------|-------|--------|----------|---------------|")
 
     for r in rows:
+        rerank_flag = "yes" if r.get("rerank") else "no"
         lines.append(
             f"| {r['name']} | {r['chunk_size']} | {r['overlap']} | {r['top_k']} "
-            f"| {r['hit_rate']:.0%} | {r['avg_score']:.4f} |"
+            f"| {rerank_flag} | {r['hit_rate']:.0%} | {r['avg_score']:.4f} |"
         )
 
     best = max(rows, key=lambda r: (r["hit_rate"], r["avg_score"]))

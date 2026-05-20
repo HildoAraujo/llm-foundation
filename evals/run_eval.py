@@ -6,7 +6,7 @@ from typing import List
 from src.loader import load_pdf_text
 from src.chunker import chunk_text
 from src.embedder import embed_text
-from src.retriever import retrieve
+from src.retriever import retrieve, retrieve_with_rerank
 from src.generator import generate_answer
 
 
@@ -66,13 +66,25 @@ def run_eval(config: dict, questions: list[dict], generate: bool = True) -> dict
         must_contain = q["must_contain"]
         expected_outcome = q.get("expected_outcome", "hit")
 
-        retrieval_result = retrieve(
-            query=question_text,
-            chunks=chunks,
-            embeddings=embeddings,
-            top_k=config["top_k"],
-            embedding_model=config["embedding_model"]
-        )
+        rerank_cfg = config.get("rerank", {})
+        if rerank_cfg.get("enabled", False):
+            retrieval_result = retrieve_with_rerank(
+                query=question_text,
+                chunks=chunks,
+                embeddings=embeddings,
+                initial_top_k=rerank_cfg["initial_top_k"],
+                final_top_k=config["top_k"],
+                rerank_model=rerank_cfg["model"],
+                embedding_model=config["embedding_model"],
+            )
+        else:
+            retrieval_result = retrieve(
+                query=question_text,
+                chunks=chunks,
+                embeddings=embeddings,
+                top_k=config["top_k"],
+                embedding_model=config["embedding_model"],
+            )
 
         retrieved_chunks = retrieval_result["chunks"]
         retrieved_ids = retrieval_result["chunk_ids"]

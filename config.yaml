@@ -1,4 +1,5 @@
 pdf_path: "data/Identifying and Scaling AI Use Cases.pdf"
+loader: "pymupdf"
 
 chunking:
   strategy: "fixed"
@@ -7,7 +8,15 @@ chunking:
 
 embedding_model: "text-embedding-3-small"
 
-top_k: 6
+retrieval:
+  top_k: 3
+  rerank:
+    enabled: true
+    model: "BAAI/bge-reranker-base"
+    initial_top_k: 20
+
+# legacy key kept for run_eval.py compatibility
+top_k: 3
 
 generation_model: "claude-sonnet-4-6"
 max_tokens: 500
